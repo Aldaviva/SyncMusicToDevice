@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 using NLog;
 using SyncMusicToDevice.Injection;
@@ -16,8 +18,9 @@ namespace SyncMusicToDevice.Service
     {
         private static readonly Logger LOGGER = LogManager.GetCurrentClassLogger();
 
-        private const string EncoderName = "m4a FDK (AAC)";
+        private const string EncoderName = @"m4a FDK (AAC)";
         private const string CompressionSettings = @"-cli_cmd=""-m 4 -p 2 --ignorelength -S -o {qt}[outfile]{qt} - """;
+        private const string CoreConverterPath = @"c:\Programs\Multimedia\dBpoweramp\CoreConverter.exe";
 
         public Task Transcode(string sourceFile, string destinationFile)
         {
@@ -25,7 +28,7 @@ namespace SyncMusicToDevice.Service
             {
                 LOGGER.Debug($"Transcoding {sourceFile} to AAC...");
 
-                var p = new ProcessStartInfo(@"c:\Programs\Multimedia\dBpoweramp\CoreConverter.exe",
+                var p = new ProcessStartInfo(CoreConverterPath,
                     $"-infile=\"{sourceFile}\" " +
                     $"-outfile=\"{destinationFile}\" " +
                     $"-convert_to=\"{EncoderName}\" " +

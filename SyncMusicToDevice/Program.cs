@@ -8,27 +8,25 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 //using System.Windows.Forms;
 using MediaDevices;
+using SyncMusicToDevice.Service;
 using TagLib;
 using File = System.IO.File;
 
 namespace SyncMusicToDevice
 {
-    static class Program
+    public static class Program
     {
         private static readonly ISet<string>
             MusicFileExtensions = new HashSet<string>(new[] { ".mp3", ".flac", ".m4a", ".ogg", ".wma" });
 
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
 //        [STAThread]
-        static void Main()
+        public static async Task Main2()
         {
 //            Application.EnableVisualStyles();
 //            Application.SetCompatibleTextRenderingDefault(false);
 //            Application.Run(new Form1());
 
-            TranscodeFile();
+            await TranscodeFile2();
 
 /*            Stopwatch stopwatch = Stopwatch.StartNew();
 
@@ -149,6 +147,16 @@ namespace SyncMusicToDevice
                 Console.WriteLine(errorText);
                 File.Delete(errorsFile);
             }
+        }
+
+        private static async Task TranscodeFile2()
+        {
+            var transcodingService = new dbPowerampTranscodingService();
+            const string source = @"D:\Music\Trance\Way Out West\Dancehall Tornado.flac";
+            string destination = Path.ChangeExtension(Path.GetTempFileName(), "m4a");
+            Console.WriteLine($"Converting {source} to {destination}");
+            await transcodingService.Transcode(source, destination);
+            Console.WriteLine("conversion done");
         }
 
         private static IEnumerable<MediaDirectoryInfo> EnumerateDirectoriesRecursively(MediaDirectoryInfo parentDirectory,

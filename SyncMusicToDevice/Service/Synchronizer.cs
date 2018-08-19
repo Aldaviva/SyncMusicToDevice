@@ -27,6 +27,7 @@ namespace SyncMusicToDevice.Service
 
         private const string DatabaseFilename = "synchronized.sqlite";
         private const int MinBitRateToTranscode = 288;
+        private const string TranscodedFileExtension = "m4a";
 
         private readonly TranscodingService transcodingService;
         private readonly DesktopMusicService desktopMusicService;
@@ -174,9 +175,10 @@ namespace SyncMusicToDevice.Service
 
             if (operation.RequiresTranscoding)
             {
-                fileToCopy = Path.GetTempFileName();
+                // dbPoweramp will only write ID tags if it recognizes the destination file extension, so .tmp leads to untagged files
+                fileToCopy = Path.ChangeExtension(Path.GetTempFileName(), TranscodedFileExtension);
+                destinationFilePath = Path.ChangeExtension(destinationFilePath, TranscodedFileExtension);
                 await transcodingService.Transcode(operation.FilePath, fileToCopy);
-                destinationFilePath = Path.ChangeExtension(destinationFilePath, "m4a");
             }
             else
             {
@@ -199,7 +201,7 @@ namespace SyncMusicToDevice.Service
                 File.Delete(fileToCopy);
             }
 
-            LOGGER.Info("{0} to device: {1}", operation.RequiresTranscoding?"Transcoded":"    Copied", operation.FilePath);
+            LOGGER.Info("{0} to device: {1}", operation.RequiresTranscoding ? "Transcoded" : "    Copied", operation.FilePath);
         }
 
         private async Task RunOperation(DeleteOperation operation)
@@ -233,20 +235,14 @@ namespace SyncMusicToDevice.Service
                     {
                         //same date, skipping file
                     }
+                    else if ((await desktopMusicService.GetChecksum(desktopFile)).SequenceEqual(fileOnDevice.Checksum))
+                    {
+                        //different date, but same checksum, skipping file
+                    }
                     else
                     {
-                        LOGGER.Info(
-                            "Different date modified for file {0} (desktop = {1}, device = {2}), calculating MD5 checksum...",
-                            desktopFile, dateModified, fileOnDevice.Modified);
-                        if ((await desktopMusicService.GetChecksum(desktopFile)).SequenceEqual(fileOnDevice.Checksum))
-                        {
-                            //different date, but same checksum, skipping file
-                        }
-                        else
-                        {
-                            //different date, different checksum, copying file
-                            pendingOperation = new CopyOperation(desktopFile, await DoesFileRequireTranscoding(desktopFile));
-                        }
+                        //different date, different checksum, copying file
+                        pendingOperation = new CopyOperation(desktopFile, await DoesFileRequireTranscoding(desktopFile));
                     }
                 }
 
@@ -270,40 +266,15 @@ namespace SyncMusicToDevice.Service
             await actionBlock.Completion;
 
             IEnumerable<DeleteOperation> pendingDeletions = deviceMusicDatabase.FindAll()
-                .Except(deviceFilesToNotDelete, new DeletionComparer()).Select(
-                    file =>
-                    {
-                        string deviceFilePath =
-                            Path.Combine(Path.GetDirectoryName(file.DesktopFilePath) ?? "", file.DeviceFileName);
-                        return new DeleteOperation(file, deviceFilePath);
-                    });
-
-            IEnumerable<SyncOperation> pendingOperations = pendingCopies.Concat(pendingDeletions);
-            return pendingOperations;
-        }
-
-        private class DeletionComparer : IEqualityComparer<SynchronizedMusicFile>
-        {
-            public bool Equals(SynchronizedMusicFile x, SynchronizedMusicFile y)
-            {
-                if (x == null && y == null)
+                .Except(deviceFilesToNotDelete, new DeletionComparer())
+                .Select(file =>
                 {
-                    return true;
-                }
-                else if (x == null || y == null)
-                {
-                    return false;
-                }
-                else
-                {
-                    return x.DesktopFilePath == y.DesktopFilePath;
-                }
-            }
+                    string deviceFilePath =
+                        Path.Combine(Path.GetDirectoryName(file.DesktopFilePath) ?? "", file.DeviceFileName);
+                    return new DeleteOperation(file, deviceFilePath);
+                });
 
-            public int GetHashCode(SynchronizedMusicFile obj)
-            {
-                return obj.DesktopFilePath.GetHashCode();
-            }
+            return pendingCopies.Concat(pendingDeletions);
         }
 
         private async Task<bool> DoesFileRequireTranscoding(string desktopFile)
@@ -345,6 +316,30 @@ namespace SyncMusicToDevice.Service
             }
 
             deviceMusicDatabase.Open(desktopDatabaseFilePath);
+        }
+    }
+
+    internal class DeletionComparer : IEqualityComparer<SynchronizedMusicFile>
+    {
+        public bool Equals(SynchronizedMusicFile x, SynchronizedMusicFile y)
+        {
+            if (x == null && y == null)
+            {
+                return true;
+            }
+            else if (x == null || y == null)
+            {
+                return false;
+            }
+            else
+            {
+                return x.DesktopFilePath == y.DesktopFilePath;
+            }
+        }
+
+        public int GetHashCode(SynchronizedMusicFile obj)
+        {
+            return obj.DesktopFilePath.GetHashCode();
         }
     }
 }
