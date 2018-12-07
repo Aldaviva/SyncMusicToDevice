@@ -122,6 +122,10 @@ namespace SyncMusicToDevice.Service
                 {
                     device.DeleteFile(GetAbsoluteDevicePath(deviceFilePath));
                 }
+                catch (FileNotFoundException)
+                {
+                    //file is already gone, which we wanted, so ignore this exception
+                }
                 finally
                 {
                     Monitor.Exit(this);
