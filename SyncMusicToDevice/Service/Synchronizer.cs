@@ -206,6 +206,7 @@ namespace SyncMusicToDevice.Service
 
         private async Task RunOperation(DeleteOperation operation)
         {
+            LOGGER.Debug("Deleting {0} from device...", operation.FilePath);
             await deviceMusicService.DeleteFileFromDevice(operation.FilePath);
             deviceMusicDatabase.DeleteFile(operation.DesktopFile.DesktopFilePath);
             LOGGER.Info("Deleted from device: {0}", operation.FilePath);
@@ -269,8 +270,7 @@ namespace SyncMusicToDevice.Service
                 .Except(deviceFilesToNotDelete, new DeletionComparer())
                 .Select(file =>
                 {
-                    string deviceFilePath =
-                        Path.Combine(Path.GetDirectoryName(file.DesktopFilePath) ?? "", file.DeviceFileName);
+                    string deviceFilePath = PathRelativePathTo.GetRelativePath(new DirectoryInfo(DesktopMusicDirectory), new FileInfo(file.DesktopFilePath));
                     return new DeleteOperation(file, deviceFilePath);
                 });
 
